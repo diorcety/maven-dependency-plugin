@@ -220,12 +220,12 @@ public abstract class AbstractDependencyMojo
 
             if ( artifact.isDirectory() )
             {
-                // usual case is a future jar packaging, but there are special cases: classifier and other packaging
-                throw new MojoExecutionException( "Artifact has not been packaged yet. When used on reactor artifact, "
-                    + "copy should be executed after packaging: see MDEP-187." );
+                FileUtils.copyDirectoryStructureIfModified( artifact, destFile );
             }
-
-            FileUtils.copyFile( artifact, destFile );
+            else
+            {
+                FileUtils.copyFile( artifact, destFile );
+            }
         }
         catch ( IOException e )
         {
@@ -261,9 +261,33 @@ public abstract class AbstractDependencyMojo
 
             if ( file.isDirectory() )
             {
-                // usual case is a future jar packaging, but there are special cases: classifier and other packaging
-                throw new MojoExecutionException( "Artifact has not been packaged yet. When used on reactor artifact, "
-                    + "unpack should be executed after packaging: see MDEP-98." );
+                getLog().info( "Copying "
+                        + file.getPath() + " to\n  " + location.getPath() + "\n   with includes " + includes
+                        + " and excludes:" + excludes );
+                try
+                {
+                    if ( !file.exists() )
+                    {
+                        return;
+                    }
+
+                    List<File> files = FileUtils.getFiles( file, includes, excludes );
+                    String sourcePath = file.getAbsolutePath();
+
+                    for ( File fileToCopy : files )
+                    {
+                        String dest = fileToCopy.getAbsolutePath();
+                        dest = dest.substring( sourcePath.length() + 1 );
+                        File destination = new File( location, dest );
+                        destination = destination.getParentFile();
+                        FileUtils.copyFileToDirectoryIfModified( fileToCopy, destination );
+                    }
+                }
+                catch ( Exception e )
+                {
+                    throw new MojoExecutionException( "Error copying artifact from " + file + " to " + location, e );
+                }
+                return;
             }
 
             UnArchiver unArchiver;
